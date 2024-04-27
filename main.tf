@@ -1,5 +1,5 @@
 module "google_api_gateway_api" {
-  source = "./Api_Gateway"
+  source = "./module"
   project_id =  var.project_id
   region = var.region
   api_config_id_prefix = var.api_config_id_prefix
