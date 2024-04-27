@@ -4,4 +4,4 @@
 *.tfstate.tfbackup
 # Ignore .terraform directory
 **/.terraform/*
-*.terraform.lock.hcl.
+*.terraform.lock.hcl
