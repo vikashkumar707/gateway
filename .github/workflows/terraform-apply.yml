@@ -16,8 +16,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Setup git global config
-        run: git config --global url."https://oauth2:${{secrets.GCP_SA_KEY}}@github.com".insteadOf https://github.com
+      # - name: Setup git global config
+      #   run: git config --global url."https://oauth2:${{secrets.GCP_SA_KEY}}@github.com".insteadOf https://github.com
 
       - name: Terraform Scan Install
         run: |
