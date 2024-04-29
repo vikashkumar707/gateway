@@ -16,8 +16,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Setup git global config
+        run: git config --global url."https://oauth2:${{secrets.GCP_SA_KEY}}@github.com".insteadOf https://github.com
+
+      - name: Terraform Scan Install
+        run: |
+          curl --location https://github.com/accurics/terrascan/releases/download/v1.9.0/terrascan_1.9.0_Linux_x86_64.tar.gz --output terrascan.tar.gz
+          tar -xf terrascan.tar.gz terrascan
+          rm terrascan.tar.gz
+          install terrascan /usr/local/bin
+          rm terrascan
+          terrascan scan -t azure  # Modify this line as needed
+        continue-on-error: true
+
+      - name: Install Checkov
+        run: |
+          pip install checkov
+      - name: Run Checkov
+        run: checkov --quiet -d .
+        continue-on-error: true
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
+
+      - name: Login to GCP
+        uses: 'google-github-actions/auth@v0.4.0'
+        with:
+         credentials_json: '${{ secrets.GCP_SA_KEY  }}'    
 
       - name: Terraform Init
         run: terraform init
