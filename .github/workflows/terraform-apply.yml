@@ -69,7 +69,8 @@ jobs:
         run: curl -Ls https://github.com/cycloidio/terracost/releases/latest/download/terracost_$(uname)_amd64 -o terracost && chmod +x terracost
 
       - name: Run Terracost Analysis
-        run: ./terracost analyze --format=json > terracost.json
+        run: |
+        terracost estimate --output=json > terracost.json
 
       - name: Upload Terracost Results
         uses: actions/upload-artifact@v2
