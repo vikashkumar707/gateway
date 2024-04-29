@@ -16,8 +16,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      # - name: Setup git global config
-      #   run: git config --global url."https://oauth2:${{secrets.GCP_SA_KEY}}@github.com".insteadOf https://github.com
 
       - name: Terraform Scan Install
         run: |
@@ -58,3 +56,23 @@ jobs:
         run: terraform apply -auto-approve
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+
+  terracost:
+    name: "Terracost Analysis"
+    runs-on: ubuntu-latest
+    needs: ["terraform"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Terracost
+        run: curl -Ls https://github.com/cycloidio/terracost/releases/latest/download/terracost_$(uname)_amd64 -o terracost && chmod +x terracost
+
+      - name: Run Terracost Analysis
+        run: ./terracost analyze --format=json > terracost.json
+
+      - name: Upload Terracost Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: terracost-results
+          path: terracost.json          
