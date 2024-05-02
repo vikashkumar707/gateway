@@ -1,11 +1,17 @@
 name: Terraform apply 
 
 on:
-  workflow_dispatch:  # Manually trigger workflow
+  workflow_dispatch:
+    inputs:
+     infra_env:
+       type: choice
+       description: 'Select Subscription'
+       options:
+         - 'CEQ-DEVOPS-SANDBOX' 
 
 jobs:
   terraform:
-    name: 'Terraform'
+    name: 'Terraform Scan & Plan'
     runs-on: ubuntu-latest
 
     defaults:
@@ -16,6 +22,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Setup git global config
+        run: git config --global url."https://oauth2:${{ secrets.VK_GCP_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Terraform Scan Install
         run: |
@@ -34,46 +42,185 @@ jobs:
         run: checkov --quiet -d .
         continue-on-error: true
 
+      - name: "Setting Environment"
+        env:
+         INFRA_ENV: ${{ github.event.inputs.infra_env }}
+        run: |
+          if [ "$INFRA_ENV" == "CEQ-DEVOPS-SANDBOX" ]; then
+           echo "project_id=" >> $GITHUB_ENV
+           echo "ENV=sandbox" >> $GITHUB_ENV
+          elif [ "$INFRA_ENV" == "nonprod" ]; then
+            echo "project_id=" >> $GITHUB_ENV
+            echo "ENV=nonprod" >> $GITHUB_ENV
+          else
+             echo "environment not supported"
+             exit 1
+          fi
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+          terraform_wrapper: false
 
       - name: Login to GCP
         uses: 'google-github-actions/auth@v0.4.0'
         with:
-         credentials_json: '${{ secrets.GCP_SA_KEY  }}'    
+         credentials_json: '${{ secrets.GCP_SA_KEY  }}'       
 
       - name: Terraform Init
         run: terraform init
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
 
       - name: Terraform Plan
         run: terraform plan
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
+      # - name: Terraform Apply
+      #   run: terraform apply -auto-approve
+      #   env:
+      #     GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
+
+      
+
+    
+
+      - name: Install Infracost
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+          # tar xzf infracost-linux-amd64.tar.gz -C /tmp
+          # mv /tmp/infracost-linux-amd64 /usr/local/bin/infracost
+          infracost --version
+
+
+      - name: Infra Auth
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+          
+            INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |              
+            infracost configure set api_key $INFRACOST_API_KEY   
+             
+      - name: Run Infracost   
+        run:  |
+                # infracost configure set api_key INFRACOST_API
+                # cd my-terraform-project
+                infracost breakdown --path .   
+                
+                
 
-  terracost:
-    name: "Terracost Analysis"
+
+ 
+                                            
+  # terraformApply: 
+  #  name: 'terraformApply'
+  #  runs-on: ubuntu-latest
+  #  needs: ["terraform"]
+  #  environment:
+  #      name: terraform_apply
+  #  defaults:
+  #    run:
+  #     shell: bash
+
+  #  steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+
+  #     # - name: "Setting Environment"
+  #     #   env:
+  #     #    INFRA_ENV: ${{ github.event.inputs.infra_env }}
+  #     #   run: |
+  #     #     if [ "$INFRA_ENV" == "CEQ-DEVOPS-SANDBOX" ]; then
+  #     #      echo "project_id=" >> $GITHUB_ENV
+  #     #      echo "ENV=sandbox" >> $GITHUB_ENV
+  #     #     elif [ "$INFRA_ENV" == "nonprod" ]; then
+  #     #       echo "project_id=" >> $GITHUB_ENV
+  #     #       echo "ENV=nonprod" >> $GITHUB_ENV
+  #     #       echo "bucket=gcp_pod_statefile" >> $GITHUB_ENV
+  #     #     else
+  #     #        echo "environment not supported"
+  #     #        exit 1
+  #     #     fi        
+
+  #     - name: "Setting Environment"
+  #       env:
+  #        INFRA_ENV: ${{ github.event.inputs.infra_env }}
+  #       run: |
+  #         if [ "$INFRA_ENV" == "CEQ-DEVOPS-SANDBOX" ]; then
+  #          echo "project_id=" >> $GITHUB_ENV
+  #          echo "ENV=sandbox" >> $GITHUB_ENV
+  #          echo "bucket=gcp_pod_statefile" >> $GITHUB_ENV
+  #          echo "prefix=statefile" >> $GITHUB_ENV
+  #         elif [ "$INFRA_ENV" == "nonprod" ]; then
+  #           echo "project_id=" >> $GITHUB_ENV
+  #           echo "ENV=nonprod" >> $GITHUB_ENV
+  #           echo "bucket=gcp_pod_statefile" >> $GITHUB_ENV
+  #           echo "prefix=statefile" >> $GITHUB_ENV
+  #         else
+  #            echo "environment not supported"
+  #            exit 1
+  #         fi
+
+  #     - name: Setup git global config
+  #       run: git config --global url."https://oauth2:${{secrets.VK_GCP_TOKEN}}@github.com".insteadOf https://github.com
+
+
+  #     - name: Terraform Init 
+  #       run: terraform init 
+  #       env:
+  #        GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
+         
+
+  #     - name: Terraform Apply
+  #       run: terraform apply -auto-approve
+  #       env:
+  #         GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
+    
+
+  terraformApply: 
+    name: 'terraformApply'
     runs-on: ubuntu-latest
     needs: ["terraform"]
+    environment:
+        name: terraform_apply
+    defaults:
+      run:
+       shell: bash
+ 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Terracost
-        run: curl -Ls https://github.com/cycloidio/terracost/releases/latest/download/terracost_$(uname)_amd64 -o terracost && chmod +x terracost
-
-      - name: Run Terracost Analysis
-        run: |
-        terracost estimate --output=json > terracost.json
-
-      - name: Upload Terracost Results
-        uses: actions/upload-artifact@v2
-        with:
-          name: terracost-results
-          path: terracost.json          
+       - name: Checkout
+         uses: actions/checkout@v2
+ 
+       - name: "Setting Environment"
+         env:
+          INFRA_ENV: ${{ github.event.inputs.infra_env }}
+         run: |
+           if [ "$INFRA_ENV" == "CEQ-DEVOPS-SANDBOX" ]; then
+            echo "project_id=" >> $GITHUB_ENV
+            echo "ENV=sandbox" >> $GITHUB_ENV
+            echo "bucket=gcp_pod_statefile" >> $GITHUB_ENV
+            echo "prefix=statefile" >> $GITHUB_ENV
+           elif [ "$INFRA_ENV" == "nonprod" ]; then
+             echo "project_id=" >> $GITHUB_ENV
+             echo "ENV=nonprod" >> $GITHUB_ENV
+             echo "bucket=gcp_pod_statefile" >> $GITHUB_ENV
+             echo "prefix=statefile" >> $GITHUB_ENV
+           else
+              echo "environment not supported"
+              exit 1
+           fi
+       - name: Setup git global config
+         run: git config --global url."https://oauth2:${{secrets.VK_GCP_TOKEN}}@github.com".insteadOf https://github.com
+ 
+ 
+       - name: Terraform Init
+         run: terraform init -reconfigure -force-copy -backend-config="bucket=$bucket" -backend-config="prefix=$prefix" -input=false
+         env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
+          
+ 
+       - name: Terraform Apply 
+         run: terraform apply -auto-approve 
+         env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SC_KEY }}
